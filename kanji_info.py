@@ -1,10 +1,11 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
 # ---------------------------------------------------------------------------
-# This file is a plugin for anki flashcard application http://repose.cx/anki/
+# Kanji Info is an addon for Anki flashcard application http://ankisrs.net
 # ---------------------------------------------------------------------------
 # File:        kanji_info.py
 # Description: Add information about kanji for each card on the answer side.
+#
 #              This information is not meant to be learnt and remembered,
 #              it's just there so you don't have to look up this information
 #              elsewhere while studying.
@@ -16,10 +17,12 @@
 #              - ...more to come (ideas?)
 #
 # Author:      Andreas Klauer (Andreas.Klauer@metamorpher.de)
-# Version:     0.05 (2008-10-22)
+# Version:     0.20 (2012-06-05)
 # License:     GPL
 # ---------------------------------------------------------------------------
 # Changelog:
+# ---- 0.20 -- 2012-06-05 -- Andreas Klauer ----
+#   rewrite Anki 1 plugin => Anki 2 addon
 # ---- 0.05 -- 2008-10-22 -- Andreas Klauer ----
 #   add some debug messages to help users
 # ---- 0.04 -- 2007-08-17 -- Andreas Klauer ----
@@ -32,14 +35,22 @@
 #   initial release
 # ---------------------------------------------------------------------------
 
-# --- initialize kanji information database ---
-from ankiqt import mw
-from ankiqt import ui
+# --- Imports: ---
+from anki.hooks import addHook
+from anki.utils import json
+from aqt import mw
+
 import os
 import codecs
 
+# --- Globals: ---
+
 kanji_info = {}
-kanji_info_version = "v0.05"
+kanji_info_version = "v0.20"
+
+# --- Functions: ---
+
+# --- initialize kanji information database ---
 
 def read_kanji_info(file):
     """Read kanji info from a 'kanji info' type of file.
@@ -62,43 +73,43 @@ def read_kanji_info(file):
 
 # --- hook ourselves into the anki drawAnswer system ---
 
-def append_kanji_info(self, drawAnswer=ui.view.View.drawAnswer):
+def append_kanji_info():
     """Append additional information about the kanji of the current card."""
-
-    # Call the original drawAnswer function first
-    drawAnswer(self)
 
     done = {}
     info = "<p></p>"
 
-    for u in self.main.currentCard.question+self.main.currentCard.answer:
-        # prevent showing same kanji twice:
-        if u not in done:
-            done[u] = 1
+    for item in mw.reviewer.card.note().items():
+        for u in item[1]:
+            # prevent showing same kanji twice:
+            if u not in done:
+                done[u] = 1
 
-            if u in kanji_info:
-                # FIXME:   I'd like to get rid of the kanji mouseover title,
-                # FIXME::  but there does not seem to be a way to get a
-                # FIXME::  furigana-alike formatting in simple HTML.
-                info += """ <span style="%s" title="%s">%s</span> """ % \
-                    ("color:#000000; font-family:KanjiStrokeOrders; font-size:128px;",
-                     kanji_info[u], u)
+                if u in kanji_info:
+                    # FIXME:   I'd like to get rid of the kanji mouseover title,
+                    # FIXME::  but there does not seem to be a way to get a
+                    # FIXME::  furigana-alike formatting in simple HTML.
+                    info += """ <span style="%s" title="%s">%s</span> """ % \
+                        ("color:#000000; font-family:KanjiStrokeOrders; font-size:128px;",
+                         kanji_info[u], u)
 
     # if there is any info, add it to the buffer
     if len(info):
-        self.buffer += "<center>%s</center>" % (info)
+        # I have no idea what I'm doing. Seriously, JavaScript?!
+        mw.reviewer.web.eval("""$("div")[0].innerHTML+=%s;""" % json.dumps(info))
 
-def initKanjiInfo():
-    kanji_info_txt = os.path.join(mw.config.configPath, "plugins", "kanji_info.txt")
+def init_kanji_info():
+    kanji_info_txt = os.path.join(mw.pm.addonFolder(), "kanji_info.txt")
     read_kanji_info(kanji_info_txt)
 
     if not len(kanji_info):
-        read_kanji_info(os.path.join(mw.config.configPath, "kanji_info.txt"))
+        # gracefully also check Anki main dir
         print "kanji_info", kanji_info_version, "please put kanji_info.txt in", kanji_info_txt
 
     print "kanji_info", kanji_info_version, "found", len(kanji_info), "entries"
 
     if len(kanji_info):
-        ui.view.View.drawAnswer = append_kanji_info
+        addHook("showAnswer", append_kanji_info)
 
-mw.addHook("init", initKanjiInfo)
+# no more init hook? oh well...
+init_kanji_info()
