@@ -49,7 +49,7 @@ import codecs
 # --- Globals: ---
 
 kanji_info = {}
-kanji_info_version = "v0.20"
+kanji_info_version = "v0.21"
 enabled = True
 
 # --- Functions: ---
