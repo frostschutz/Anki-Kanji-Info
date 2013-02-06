@@ -21,6 +21,8 @@
 # License:     GPL
 # ---------------------------------------------------------------------------
 # Changelog:
+# ---- 0.21 -- 2013-02-07 -- Andreas Klauer ----
+#   add a simple on/off toggle
 # ---- 0.20 -- 2012-06-05 -- Andreas Klauer ----
 #   rewrite Anki 1 plugin => Anki 2 addon
 # ---- 0.05 -- 2008-10-22 -- Andreas Klauer ----
@@ -36,9 +38,10 @@
 # ---------------------------------------------------------------------------
 
 # --- Imports: ---
-from anki.hooks import addHook
+from anki.hooks import addHook, wrap
 from anki.utils import json
-from aqt import mw
+from aqt import *
+from aqt.utils import showInfo
 
 import os
 import codecs
@@ -47,6 +50,7 @@ import codecs
 
 kanji_info = {}
 kanji_info_version = "v0.20"
+enabled = True
 
 # --- Functions: ---
 
@@ -75,6 +79,9 @@ def read_kanji_info(file):
 
 def append_kanji_info():
     """Append additional information about the kanji of the current card."""
+    global enabled
+    if not enabled:
+        return
 
     done = {}
     info = "<p></p>"
@@ -111,5 +118,41 @@ def init_kanji_info():
     if len(kanji_info):
         addHook("showAnswer", append_kanji_info)
 
-# no more init hook? oh well...
-init_kanji_info()
+def toggle():
+    global enabled
+    enabled=not enabled
+
+    if enabled:
+        showInfo("kanji_info is now ON")
+    else:
+        showInfo("kanji_info is now OFF")
+
+def kanji_info_Menu():
+    '''Extend the addon menu with toggle.'''
+    km = None
+
+    for action in mw.form.menuPlugins.actions():
+        menu = action.menu()
+        if menu and menu.title() == "kanji_info":
+            km = menu
+            break
+
+    if not km:
+        return
+
+    a = QAction(_("Toggle ON/OFF..."), mw)
+    mw.connect(a, SIGNAL("triggered()"), toggle)
+    km.addAction(a)
+
+def profileLoaded():
+    '''Initialize Kanji Info'''
+
+    # load the kanji_info.txt
+    init_kanji_info()
+
+    # add menu entry
+    mw.addonManager.rebuildAddonsMenu = wrap(mw.addonManager.rebuildAddonsMenu,
+                                             kanji_info_Menu)
+    mw.addonManager.rebuildAddonsMenu()
+
+addHook("profileLoaded", profileLoaded)
